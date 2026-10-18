@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 void main() {
@@ -22,14 +21,10 @@ class MyApp extends StatelessWidget {
         body: const Center(
           child: Text(
             'Hello World',
-            style: TextStyle(
-              fontSize: 24,
-              color: Colors.black,
-            ),
+            style: TextStyle(fontSize: 24, color: Colors.black),
           ),
         ),
       ),
     );
   }
 }
-
