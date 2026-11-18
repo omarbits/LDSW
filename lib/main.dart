@@ -237,21 +237,17 @@ class _AuthScreenState extends State<AuthScreen> {
         'invalid-credential' ||
         'invalid-login-credentials' ||
         'wrong-password' ||
-        'user-not-found' =>
-          'Correo o contraseña incorrectos.',
+        'user-not-found' => 'Correo o contraseña incorrectos.',
         'email-already-in-use' =>
           'Ya existe una cuenta con ese correo electrónico.',
-        'weak-password' =>
-          'La contraseña debe tener al menos 6 caracteres.',
-        'invalid-email' =>
-          'El correo electrónico no tiene un formato válido.',
+        'weak-password' => 'La contraseña debe tener al menos 6 caracteres.',
+        'invalid-email' => 'El correo electrónico no tiene un formato válido.',
         'too-many-requests' =>
           'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
         _ => error.message ?? 'No se pudo autenticar la cuenta.',
       };
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -354,8 +350,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             final error = snapshot.error;
-            final message = error is FirebaseException &&
-                    error.code == 'permission-denied'
+            final message =
+                error is FirebaseException && error.code == 'permission-denied'
                 ? 'No tienes permiso para ver el catálogo.'
                 : 'No se pudo cargar el catálogo.';
             return Center(
