@@ -93,10 +93,10 @@ class HomeScreen extends StatelessWidget {
             'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba'
             '?auto=format&fit=crop&w=1200&q=80',
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) =>
+            errorBuilder: (_, _, _) =>
                 Container(color: const Color(0xFF202C43)),
           ),
-          Container(color: Colors.black.withOpacity(0.65)),
+          Container(color: Colors.black.withValues(alpha: 0.65)),
           SafeArea(
             child: Center(
               child: Padding(
@@ -324,7 +324,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
         title: const Text('Filmapp | Catálogo'),
         actions: [
           IconButton(
-            tooltip: 'Cerrar sesión',
+            tooltip: 'Salir',
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
@@ -402,7 +402,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
                           child: Image.network(
                             movie.imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
+                            errorBuilder: (_, _, _) =>
                                 const Icon(Icons.movie, size: 60),
                           ),
                         ),
@@ -433,11 +433,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
         },
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 1,
+        currentIndex: 0,
         onTap: (index) {
-          if (index == 0) {
-            Navigator.popUntil(context, (route) => route.isFirst);
-          } else if (index == 2) {
+          if (index == 1) {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AdminScreen()),
@@ -445,7 +443,6 @@ class _CatalogScreenState extends State<CatalogScreen> {
           }
         },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
           BottomNavigationBarItem(icon: Icon(Icons.movie), label: 'Catálogo'),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
@@ -476,7 +473,7 @@ class MovieDetailScreen extends StatelessWidget {
               movie.imageUrl,
               height: 320,
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const SizedBox(
+              errorBuilder: (_, _, _) => const SizedBox(
                 height: 220,
                 child: Icon(Icons.movie, size: 90),
               ),
@@ -521,6 +518,7 @@ class _AdminScreenState extends State<AdminScreen> {
   final genreController = TextEditingController();
   final synopsisController = TextEditingController();
   final imageController = TextEditingController();
+  Movie? editingMovie;
   bool isSaving = false;
 
   @override
@@ -534,7 +532,29 @@ class _AdminScreenState extends State<AdminScreen> {
     super.dispose();
   }
 
-  Future<void> addMovie() async {
+  void clearForm() {
+    titleController.clear();
+    yearController.clear();
+    directorController.clear();
+    genreController.clear();
+    synopsisController.clear();
+    imageController.clear();
+    editingMovie = null;
+  }
+
+  void startEditing(Movie movie) {
+    setState(() {
+      editingMovie = movie;
+      titleController.text = movie.title;
+      yearController.text = movie.year;
+      directorController.text = movie.director;
+      genreController.text = movie.genre;
+      synopsisController.text = movie.synopsis;
+      imageController.text = movie.imageUrl;
+    });
+  }
+
+  Future<void> saveMovie() async {
     if (titleController.text.trim().isEmpty ||
         yearController.text.trim().isEmpty ||
         directorController.text.trim().isEmpty ||
@@ -549,25 +569,38 @@ class _AdminScreenState extends State<AdminScreen> {
 
     setState(() => isSaving = true);
     try {
-      await FirebaseFirestore.instance.collection('movies').add({
+      final data = {
         'title': titleController.text.trim(),
         'year': yearController.text.trim(),
         'director': directorController.text.trim(),
         'genre': genreController.text.trim(),
         'synopsis': synopsisController.text.trim(),
         'imageUrl': imageController.text.trim(),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      };
+      final movie = editingMovie;
+      if (movie == null) {
+        await FirebaseFirestore.instance.collection('movies').add({
+          ...data,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        await FirebaseFirestore.instance
+            .collection('movies')
+            .doc(movie.id)
+            .update(data);
+      }
 
-      titleController.clear();
-      yearController.clear();
-      directorController.clear();
-      genreController.clear();
-      synopsisController.clear();
-      imageController.clear();
+      if (!mounted) return;
+      setState(clearForm);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Película agregada al catálogo.')),
+        SnackBar(
+          content: Text(
+            movie == null
+                ? 'Película agregada al catálogo.'
+                : 'Película actualizada.',
+          ),
+        ),
       );
     } on FirebaseException catch (error) {
       if (!mounted) return;
@@ -586,9 +619,11 @@ class _AdminScreenState extends State<AdminScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'Dar de alta una película',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          Text(
+            editingMovie == null
+                ? 'Dar de alta una película'
+                : 'Editar película',
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -619,14 +654,31 @@ class _AdminScreenState extends State<AdminScreen> {
             decoration: const InputDecoration(labelText: 'URL de la imagen'),
           ),
           const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: isSaving ? null : addMovie,
-            icon: const Icon(Icons.add),
-            label: const Text('Dar de alta película'),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: isSaving ? null : saveMovie,
+                  icon: Icon(editingMovie == null ? Icons.add : Icons.save),
+                  label: Text(
+                    editingMovie == null
+                        ? 'Dar de alta película'
+                        : 'Guardar cambios',
+                  ),
+                ),
+              ),
+              if (editingMovie != null) ...[
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: isSaving ? null : () => setState(clearForm),
+                  child: const Text('Cancelar'),
+                ),
+              ],
+            ],
           ),
           const Divider(height: 32),
           const Text(
-            'Dar de baja una película',
+            'Administrar películas',
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
@@ -653,18 +705,66 @@ class _AdminScreenState extends State<AdminScreen> {
                         leading: const Icon(Icons.movie),
                         title: Text(movie.title),
                         subtitle: Text(movie.year),
-                        trailing: IconButton(
-                          tooltip: 'Eliminar película',
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.red,
-                          ),
-                          onPressed: () async {
-                            await FirebaseFirestore.instance
-                                .collection('movies')
-                                .doc(movie.id)
-                                .delete();
-                          },
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Editar película',
+                              icon: const Icon(Icons.edit_outlined),
+                              onPressed: () => startEditing(movie),
+                            ),
+                            IconButton(
+                              tooltip: 'Eliminar película',
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.red,
+                              ),
+                              onPressed: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (dialogContext) => AlertDialog(
+                                    title: const Text('Eliminar película'),
+                                    content: Text(
+                                      '¿Eliminar "${movie.title}" del catálogo?',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(dialogContext, false),
+                                        child: const Text('Cancelar'),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () =>
+                                            Navigator.pop(dialogContext, true),
+                                        child: const Text('Eliminar'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed != true) return;
+                                if (!context.mounted) return;
+                                final messenger = ScaffoldMessenger.of(context);
+                                try {
+                                  await FirebaseFirestore.instance
+                                      .collection('movies')
+                                      .doc(movie.id)
+                                      .delete();
+                                  if (editingMovie?.id == movie.id && mounted) {
+                                    setState(clearForm);
+                                  }
+                                } on FirebaseException catch (error) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        error.message ??
+                                            'No se pudo eliminar la película.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          ],
                         ),
                       ),
                     )
